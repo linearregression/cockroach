@@ -192,8 +192,8 @@ func TestTxnPutOutOfOrder(t *testing.T) {
 
 	// Set up a filter to so that the get operation at Step 3 will return an error (simulating
 	// artificial delay).
-	var numGets atomic.Value
-	numGets.Store(0)
+	var numGets int32
+	numGets = 0
 	storage.TestingCommandFilter = func(args proto.Request, reply proto.Response) bool {
 		if _, ok := args.(*proto.GetRequest); ok &&
 			args.Header().Key.Equal(proto.Key(key)) &&
@@ -202,10 +202,7 @@ func TestTxnPutOutOfOrder(t *testing.T) {
 			// (the first request fails and triggers txn push, and then the second request
 			// succeeds). Returns an error for the fourth get request to add delay after
 			// the second get operation pushes the txn and resolves the write intent.
-			v := numGets.Load().(int)
-			v++
-			numGets.Store(v)
-			if v == 4 {
+			if atomic.AddInt32(&numGets, 1) == 4 {
 				reply.Header().SetGoError(util.Errorf("Test"))
 				return true
 			}
